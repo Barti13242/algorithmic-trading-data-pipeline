@@ -29,5 +29,4 @@ with open("finalny_raport_bota.txt", "w", encoding="utf-8") as plik:
             decyzja = "CZEKAJ / SPRZEDAJ 📉"
         linia_raportu = f"[{ticker}] Najlepsze okno: SMA {najlepsze_okno} (Zysk hist: {najwyzszy_zysk*100:.2f}%). Decyzja na dziś: {decyzja}\n"
         plik.write(linia_raportu)
-
 print("=== PROCES ZAKOŃCZONY SUKCESEM! RAPORT ZAPISANY ===")
