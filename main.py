@@ -1,32 +1,60 @@
 import yfinance as yf
-moje_spolki = ["MSFT", "TSLA", "GOOGL", "META"]
-testowane_srednie = [5, 10, 15, 20, 25, 30]
-print("=== INICJACJA AUTONOMICZNEGO BOTA GIEŁDOWEGO ===")
-with open("finalny_raport_bota.txt", "w", encoding="utf-8") as plik:
-    plik.write("=== RESTRUKTURYZOWANY RAPORT ANALITYCZNY BI ===\n")
-    plik.write("Wygenerowano automatycznie przez: Python Data Pipeline\n\n")
-    for ticker in moje_spolki:
-        print(f"Przetwarzam dane dla: {ticker}...")
-        tabela = yf.Ticker(ticker).history(period="1y")
-        ceny = tabela["Close"]
-        zwrot_rynku = ceny.pct_change()
-        najlepsze_okno = 20
-        najwyzszy_zysk = -999999
-        for okno in testowane_srednie:
-            sma = ceny.rolling(window=okno).mean()
-            sygnal = (ceny > sma).astype(int).shift(1)
-            zwrot_strategii = zwrot_rynku * sygnal
-            koncowy_zysk = (1 + zwrot_strategii).cumprod().iloc[-1] - 1
-            if koncowy_zysk > najwyzszy_zysk:
-                najwyzszy_zysk = koncowy_zysk
-                najlepsze_okno = okno
-        ostateczna_sma = ceny.rolling(window=najlepsze_okno).mean()
-        dzisiejsza_cena = ceny.iloc[-1]
-        dzisiejsza_sma = ostateczna_sma.iloc[-1]
-        if dzisiejsza_cena > dzisiejsza_sma:
-            decyzja = "KUPUJ! 📈"
-        else:
-            decyzja = "CZEKAJ / SPRZEDAJ 📉"
-        linia_raportu = f"[{ticker}] Najlepsze okno: SMA {najlepsze_okno} (Zysk hist: {najwyzszy_zysk*100:.2f}%). Decyzja na dziś: {decyzja}\n"
-        plik.write(linia_raportu)
-print("=== PROCES ZAKOŃCZONY SUKCESEM! RAPORT ZAPISANY ===")
+import pandas as pd
+import matplotlib.pyplot as plt
+
+spolki = ['MSFT', 'TSLA', 'GOOGL', 'META']
+print("=== INICJACJA AUTONOMICZNEGO BOTA GIEŁDOWEGO Z SYGNAŁAMI ===")
+
+for ticker in spolki:
+    print(f"\nPrzetwarzam dane dla: {ticker}...")
+    dane = yf.download(ticker, period="3m", interval="1d")
+    
+    if dane.empty:
+        print(f"Brak danych dla {ticker}")
+        continue
+    
+    # Naprawa struktury danych dla nowej wersji yfinance
+    if isinstance(dane.columns, pd.MultiIndex):
+        dane.columns = dane.columns.droplevel(1)
+        
+    # Obliczanie średnich kroczących
+    dane['SMA5'] = dane['Close'].rolling(window=5).mean()
+    dane['SMA20'] = dane['Close'].rolling(window=20).mean()
+    
+    ostatni_dzien = dane.iloc[-1]
+    cena_zamkniecia = float(ostatni_dzien['Close'])
+    sma5 = float(ostatni_dzien['SMA5'])
+    sma20 = float(ostatni_dzien['SMA20'])
+    
+    if sma5 > sma20:
+        rekomendacja = "KUPUJ"
+        znacznik = "🟢"
+    elif sma5 < sma20:
+        rekomendacja = "SPRZEDAJ"
+        znacznik = "🔴"
+    else:
+        rekomendacja = "CZEKAJ"
+        znacznik = "🟡"
+        
+    print(f"Aktualna cena {ticker}: {cena_zamkniecia:.2f} USD")
+    print(f"Rekomendacja bota: {znacznik} {rekomendacja}")
+    
+    # Rysowanie i wymuszenie zapisu wykresu
+    try:
+        plt.figure(figsize=(10, 5))
+        plt.plot(dane.index, dane['Close'], label='Cena', color='blue')
+        plt.plot(dane.index, dane['SMA5'], label='SMA 5', color='orange')
+        plt.plot(dane.index, dane['SMA20'], label='SMA 20', color='red')
+        plt.title(f"{ticker} - {rekomendacja}")
+        plt.grid(True)
+        plt.legend()
+        
+        # Zapis bezpośrednio do głównego folderu bota
+        sciezka_wykresu = f"C:/BotGieldowy/wykres_{ticker}.png"
+        plt.savefig(sciezka_wykresu, bbox_inches='tight')
+        plt.close()
+        print(f"Sukces! Wykres zapisany w: {sciezka_wykresu}")
+    except Exception as e:
+        print(f"Błąd podczas tworzenia wykresu dla {ticker}: {e}")
+
+print("\n=== PROCES ZAKOŃCZONY! SPRAWDŹ FOLDER C:/BotGieldowy ===")
